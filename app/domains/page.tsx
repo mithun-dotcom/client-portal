@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
+import DomainPanel from "@/components/DomainPanel";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
-import { Copy, RefreshCw, X } from "lucide-react";
+import { Copy, RefreshCw, X, Settings2 } from "lucide-react";
 
 type Domain = {
   id: string;
@@ -12,35 +13,42 @@ type Domain = {
   nameservers: string[];
 };
 
+type Mailbox = { id: string; domainId: string };
+
 export default function DomainsPage() {
   const [domains, setDomains] = useState<Domain[]>([]);
+  const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [input, setInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [checkingId, setCheckingId] = useState("");
+  const [selected, setSelected] = useState<Domain | null>(null);
 
   async function load() {
     const res = await fetch("/api/domains");
     if (res.ok) setDomains(await res.json());
+    const mres = await fetch("/api/mailboxes");
+    if (mres.ok) setMailboxes(await mres.json());
   }
 
   useEffect(() => {
     load();
   }, []);
 
+  function mailboxCount(domainId: string) {
+    return mailboxes.filter((m) => m.domainId === domainId).length;
+  }
+
   async function connectDomains() {
     setSaving(true);
     setMessage("");
-
     const res = await fetch("/api/domains", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ names: input }),
     });
-
     setSaving(false);
-
     if (res.ok) {
       const data = await res.json();
       const failed = data.results.filter((r: { ok: boolean }) => !r.ok);
@@ -71,10 +79,6 @@ export default function DomainsPage() {
     load();
   }
 
-  function copyNameservers(ns: string[]) {
-    navigator.clipboard.writeText(ns.join("\n"));
-  }
-
   return (
     <>
       <Show when="signed-out">
@@ -93,7 +97,6 @@ export default function DomainsPage() {
           <Sidebar />
 
           <main className="flex-1 overflow-y-auto">
-            {/* Top bar */}
             <div className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-4">
               <h1 className="text-lg font-semibold text-gray-900">Domains</h1>
               <UserButton />
@@ -115,21 +118,21 @@ export default function DomainsPage() {
                 </button>
               </div>
 
-              {/* Table */}
               <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-gray-100 text-gray-500">
                     <tr>
                       <th className="px-6 py-4 font-medium">Domain Name</th>
+                      <th className="px-6 py-4 font-medium">Mailboxes</th>
                       <th className="px-6 py-4 font-medium">Status</th>
-                      <th className="px-6 py-4 font-medium">Nameservers</th>
-                      <th className="px-6 py-4 font-medium">Check Status</th>
+                      <th className="px-6 py-4 font-medium">Check</th>
+                      <th className="px-6 py-4 font-medium">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {domains.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-6 py-10 text-center text-gray-400">
+                        <td colSpan={5} className="px-6 py-10 text-center text-gray-400">
                           No domains yet — click Connect Existing to add some
                         </td>
                       </tr>
@@ -138,6 +141,9 @@ export default function DomainsPage() {
                       <tr key={d.id} className="border-b border-gray-50">
                         <td className="px-6 py-4 font-semibold text-gray-900">
                           {d.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {mailboxCount(d.id)}
                         </td>
                         <td className="px-6 py-4">
                           {d.status === "active" ? (
@@ -150,20 +156,6 @@ export default function DomainsPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
-                          <span className="flex items-center gap-2">
-                            {d.nameservers.join(", ") || "-"}
-                            {d.nameservers.length > 0 && (
-                              <button
-                                onClick={() => copyNameservers(d.nameservers)}
-                                title="Copy nameservers"
-                                className="text-gray-400 hover:text-gray-700"
-                              >
-                                <Copy size={15} />
-                              </button>
-                            )}
-                          </span>
-                        </td>
                         <td className="px-6 py-4">
                           <button
                             onClick={() => checkStatus(d.id)}
@@ -175,6 +167,15 @@ export default function DomainsPage() {
                               className={checkingId === d.id ? "animate-spin" : ""}
                             />
                             Check
+                          </button>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => setSelected(d)}
+                            className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            <Settings2 size={13} />
+                            Manage
                           </button>
                         </td>
                       </tr>
@@ -201,10 +202,8 @@ export default function DomainsPage() {
                   </button>
                 </div>
                 <p className="mt-1 text-sm text-gray-500">
-                  Paste your domains below — one per line (or separated by
-                  commas). We&apos;ll generate nameservers for each one.
+                  Paste your domains — one per line or separated by commas.
                 </p>
-
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -212,11 +211,7 @@ export default function DomainsPage() {
                   rows={6}
                   className="mt-4 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-emerald-700"
                 />
-
-                {message && (
-                  <p className="mt-2 text-sm text-red-600">{message}</p>
-                )}
-
+                {message && <p className="mt-2 text-sm text-red-600">{message}</p>}
                 <div className="mt-5 flex justify-end gap-3">
                   <button
                     onClick={() => setModalOpen(false)}
@@ -234,6 +229,15 @@ export default function DomainsPage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Manage panel */}
+          {selected && (
+            <DomainPanel
+              domain={selected}
+              mailboxCount={mailboxCount(selected.id)}
+              onClose={() => setSelected(null)}
+            />
           )}
         </div>
       </Show>
