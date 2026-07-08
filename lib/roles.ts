@@ -19,7 +19,8 @@ export async function getRole(): Promise<{
     });
   }
 
-  return { userId, role: record.role as "client" | "team" | "admin" };
+  const cleanRole = (record.role || "client").trim() as "client" | "team" | "admin";
+  return { userId, role: cleanRole };
 }
 
 export async function getEffectiveUserId(): Promise<string | null> {

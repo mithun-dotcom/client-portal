@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import {
   Home, Globe, Mail, Activity, GitBranch, Download,
   Flame, BarChart3, Wallet, CalendarClock, Settings, Zap, ShieldCheck,
@@ -27,6 +28,7 @@ const workspaceNav = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user } = useUser();
   const [role, setRole] = useState("client");
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export default function Sidebar() {
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
+      {/* Workspace switcher */}
       <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-sm font-bold text-rose-500">
           CY
@@ -47,12 +50,14 @@ export default function Sidebar() {
         <span className="text-lg font-semibold text-gray-900">Cyber Plan</span>
       </div>
 
+      {/* Quick Setup button */}
       <div className="px-4 pt-4">
         <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-900 py-3 text-sm font-semibold text-white hover:bg-emerald-800">
           <Zap size={16} /> Quick Setup
         </button>
       </div>
 
+      {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {(role === "admin" || role === "team") && (
           <>
@@ -84,16 +89,17 @@ export default function Sidebar() {
         ))}
       </nav>
 
+      {/* User footer — always shows the REAL signed-in user */}
       <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-600">
-          MI
+          {(user?.firstName?.[0] || "U").toUpperCase()}
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-gray-900">
-            Mithun Pramanik
+            {user?.fullName || "Loading..."}
           </p>
           <p className="truncate text-xs text-gray-500">
-            mithunpk124604@gm...
+            {user?.emailAddresses?.[0]?.emailAddress || ""}
           </p>
         </div>
       </div>

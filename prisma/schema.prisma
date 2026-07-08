@@ -40,3 +40,12 @@ model UserRole {
   role      String   @default("client") // client | team | admin
   createdAt DateTime @default(now())
 }
+model ArchivedClient {
+  id           String   @id @default(cuid())
+  userId       String
+  email        String
+  domainCount  Int      @default(0)
+  mailboxCount Int      @default(0)
+  note         String?
+  deletedAt    DateTime @default(now())
+}
