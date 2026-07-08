@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 
 const CF = "https://api.cloudflare.com/client/v4";
@@ -17,7 +17,6 @@ async function ensureRecord(
   name: string,
   content: string
 ) {
-  // create; if it already exists Cloudflare errors — we ignore that
   await fetch(CF + "/zones/" + zoneId + "/dns_records", {
     method: "POST",
     headers: cfHeaders(),
@@ -44,12 +43,11 @@ async function deletePortalPageRules(zoneId: string) {
   }
 }
 
-// POST { url } — set up forwarding: A + CNAME records, then a Page Rule
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
@@ -67,11 +65,9 @@ export async function POST(
     );
   }
 
-  // 1) DNS records so the domain resolves through Cloudflare's proxy
   await ensureRecord(domain.zoneId, "A", domain.name, "192.0.2.1");
   await ensureRecord(domain.zoneId, "CNAME", "www." + domain.name, domain.name);
 
-  // 2) replace any previous forwarding rule, then create the new one
   await deletePortalPageRules(domain.zoneId);
 
   const res = await fetch(CF + "/zones/" + domain.zoneId + "/pagerules", {
@@ -107,12 +103,11 @@ export async function POST(
   return NextResponse.json(updated);
 }
 
-// DELETE — remove forwarding page rule
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;

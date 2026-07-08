@@ -33,3 +33,10 @@ model Mailbox {
 
   @@unique([email])
 }
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  email     String
+  role      String   @default("client") // client | team | admin
+  createdAt DateTime @default(now())
+}

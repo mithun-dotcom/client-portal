@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 
-// GET — list the user's mailboxes
 export async function GET() {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -17,9 +16,8 @@ export async function GET() {
   return NextResponse.json(mailboxes);
 }
 
-// POST — create mailbox orders (status: pending, provisioned later)
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -49,7 +47,6 @@ export async function POST(request: Request) {
       continue;
     }
 
-    // the domain must belong to this user and be active
     const domain = await prisma.domain.findFirst({
       where: { id: item.domainId, userId },
     });

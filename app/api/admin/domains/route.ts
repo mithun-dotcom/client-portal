@@ -31,7 +31,6 @@ async function createCloudflareZone(name: string) {
   };
 }
 
-// GET — list the current (or impersonated) user's domains
 export async function GET() {
   const userId = await getEffectiveUserId();
   if (!userId) {
@@ -46,7 +45,6 @@ export async function GET() {
   return NextResponse.json(domains);
 }
 
-// POST — connect one or many existing domains
 export async function POST(request: Request) {
   const userId = await getEffectiveUserId();
   if (!userId) {

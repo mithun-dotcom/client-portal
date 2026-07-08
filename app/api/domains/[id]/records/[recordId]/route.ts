@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 
 const CF = "https://api.cloudflare.com/client/v4";
@@ -15,7 +15,7 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string; recordId: string }> }
 ) {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id, recordId } = await params;
@@ -53,7 +53,7 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string; recordId: string }> }
 ) {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id, recordId } = await params;

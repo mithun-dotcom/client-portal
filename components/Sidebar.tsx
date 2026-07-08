@@ -1,10 +1,11 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Globe, Mail, Activity, GitBranch, Download,
-  Flame, BarChart3, Wallet, CalendarClock, Settings, Zap,
+  Flame, BarChart3, Wallet, CalendarClock, Settings, Zap, ShieldCheck,
 } from "lucide-react";
 
 const mainNav = [
@@ -26,6 +27,16 @@ const workspaceNav = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [role, setRole] = useState("client");
+
+  useEffect(() => {
+    fetch("/api/me").then(async (res) => {
+      if (res.ok) {
+        const data = await res.json();
+        setRole(data.role);
+      }
+    });
+  }, []);
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
@@ -43,6 +54,21 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {(role === "admin" || role === "team") && (
+          <>
+            <p className="px-3 pb-2 text-xs font-semibold tracking-wider text-gray-400">
+              STAFF
+            </p>
+            <NavItem
+              name="Admin Panel"
+              icon={ShieldCheck}
+              href="/admin"
+              active={pathname === "/admin"}
+            />
+            <div className="my-3 border-t border-gray-100" />
+          </>
+        )}
+
         <p className="px-3 pb-2 text-xs font-semibold tracking-wider text-gray-400">
           MAIN
         </p>

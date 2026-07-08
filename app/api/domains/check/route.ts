@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 
-// POST { id } — re-check a domain's status on Cloudflare
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
