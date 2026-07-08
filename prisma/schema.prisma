@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Domain {
+  id          String   @id @default(cuid())
+  name        String
+  status      String   @default("pending")
+  nameservers String[]
+  zoneId      String?
+  userId      String
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, name])
+}
+model Mailbox {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  username  String
+  domainId  String
+  email     String
+  platform  String   @default("google")
+  status    String   @default("pending")
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([email])
+}

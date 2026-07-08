@@ -1,28 +1,32 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Home, Globe, Mail, Activity, GitBranch, Download,
   Flame, BarChart3, Wallet, CalendarClock, Settings, Zap,
 } from "lucide-react";
 
 const mainNav = [
-  { name: "Home", icon: Home, active: true },
-  { name: "Domains", icon: Globe },
-  { name: "Mailboxes", icon: Mail },
-  { name: "Warmup", icon: Activity, badge: "New" },
-  { name: "Sequencers", icon: GitBranch },
-  { name: "Exports", icon: Download },
-  { name: "Prewarm", icon: Flame, badge: "New" },
-  { name: "Email Insights", icon: BarChart3 },
+  { name: "Home", icon: Home, href: "/" },
+  { name: "Domains", icon: Globe, href: "/domains" },
+  { name: "Mailboxes", icon: Mail, href: "/mailboxes" },
+  { name: "Warmup", icon: Activity, href: "#", badge: "New" },
+  { name: "Sequencers", icon: GitBranch, href: "#" },
+  { name: "Exports", icon: Download, href: "#" },
+  { name: "Prewarm", icon: Flame, href: "#", badge: "New" },
+  { name: "Email Insights", icon: BarChart3, href: "#" },
 ];
 
 const workspaceNav = [
-  { name: "Wallet Logs", icon: Wallet },
-  { name: "Renewals", icon: CalendarClock, badge: "New" },
-  { name: "Settings", icon: Settings },
+  { name: "Wallet Logs", icon: Wallet, href: "#" },
+  { name: "Renewals", icon: CalendarClock, href: "#", badge: "New" },
+  { name: "Settings", icon: Settings, href: "#" },
 ];
 
 export default function Sidebar() {
+  const pathname = usePathname();
+
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
       <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-4">
@@ -43,14 +47,14 @@ export default function Sidebar() {
           MAIN
         </p>
         {mainNav.map((item) => (
-          <NavItem key={item.name} {...item} />
+          <NavItem key={item.name} {...item} active={pathname === item.href} />
         ))}
 
         <p className="px-3 pb-2 pt-6 text-xs font-semibold tracking-wider text-gray-400">
           WORKSPACE
         </p>
         {workspaceNav.map((item) => (
-          <NavItem key={item.name} {...item} />
+          <NavItem key={item.name} {...item} active={pathname === item.href} />
         ))}
       </nav>
 
@@ -74,11 +78,13 @@ export default function Sidebar() {
 function NavItem({
   name,
   icon: Icon,
+  href,
   active,
   badge,
 }: {
   name: string;
   icon: React.ElementType;
+  href: string;
   active?: boolean;
   badge?: string;
 }) {
@@ -89,7 +95,7 @@ function NavItem({
     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900";
 
   return (
-    <a href="#" className={base + colors}>
+    <Link href={href} className={base + colors}>
       <span className="flex items-center gap-3">
         <Icon size={18} /> {name}
       </span>
@@ -98,6 +104,6 @@ function NavItem({
           {badge}
         </span>
       )}
-    </a>
+    </Link>
   );
 }

@@ -1,10 +1,32 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
+import AddDomainModal from "@/components/AddDomainModal";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { Globe, Mail, Link2, Download } from "lucide-react";
 
+type Domain = {
+  id: string;
+  name: string;
+  status: string;
+};
+
 export default function Dashboard() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [domains, setDomains] = useState<Domain[]>([]);
+
+  async function loadDomains() {
+    const res = await fetch("/api/domains");
+    if (res.ok) {
+      setDomains(await res.json());
+    }
+  }
+
+  useEffect(() => {
+    loadDomains();
+  }, []);
+
   return (
     <>
       {/* ============ LOGGED OUT: sign-in screen ============ */}
@@ -31,6 +53,7 @@ export default function Dashboard() {
           <Sidebar />
 
           <main className="flex-1 overflow-y-auto">
+            {/* Top bar */}
             <div className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-4">
               <h1 className="text-lg font-semibold text-gray-900">Home</h1>
               <div className="flex items-center gap-4">
@@ -42,15 +65,18 @@ export default function Dashboard() {
             </div>
 
             <div className="px-8 py-6">
+              {/* Quick actions */}
               <p className="pb-3 text-xs font-semibold tracking-wider text-gray-400">
                 QUICK ACTIONS
               </p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <ActionCard
-                  icon={Globe}
-                  title="Add Domain"
-                  subtitle="Register new domains"
-                />
+                <div onClick={() => setModalOpen(true)}>
+                  <ActionCard
+                    icon={Globe}
+                    title="Add Domain"
+                    subtitle="Register new domains"
+                  />
+                </div>
                 <ActionCard
                   icon={Mail}
                   title="Add Mailbox"
@@ -68,26 +94,32 @@ export default function Dashboard() {
                 />
               </div>
 
+              {/* Infrastructure stats */}
               <p className="pb-3 pt-8 text-xs font-semibold tracking-wider text-gray-400">
                 YOUR INFRASTRUCTURE
               </p>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <StatCard
                   title="Domains"
-                  value="1"
+                  value={String(domains.length)}
                   label="total domains"
-                  detail="1 Active · 0 Pending · 0 Protected"
-                  percent={100}
+                  detail={
+                    domains.length > 0
+                      ? domains.map((d) => d.name).join(" · ")
+                      : "No domains yet — click Add Domain to start"
+                  }
+                  percent={domains.length > 0 ? 100 : 0}
                 />
                 <StatCard
                   title="Mailboxes"
-                  value="50"
+                  value="0"
                   label="total mailboxes"
                   detail="0 In Use · 0 Available · 0 Warming Up"
                   percent={0}
                 />
               </div>
 
+              {/* Activity placeholder */}
               <p className="pb-3 pt-8 text-xs font-semibold tracking-wider text-gray-400">
                 YOUR ACTIVITY
               </p>
@@ -96,6 +128,13 @@ export default function Dashboard() {
               </div>
             </div>
           </main>
+
+          {/* Add Domain popup */}
+          <AddDomainModal
+            open={modalOpen}
+            onClose={() => setModalOpen(false)}
+            onAdded={loadDomains}
+          />
         </div>
       </Show>
     </>
@@ -112,7 +151,7 @@ function ActionCard({
   subtitle: string;
 }) {
   return (
-    <button className="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5 text-left hover:border-gray-300 hover:shadow-sm">
+    <button className="flex w-full items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5 text-left hover:border-gray-300 hover:shadow-sm">
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700">
         <Icon size={20} />
       </div>
