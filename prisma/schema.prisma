@@ -49,3 +49,15 @@ model ArchivedClient {
   note         String?
   deletedAt    DateTime @default(now())
 }
+model EmailStat {
+  id        String   @id @default(cuid())
+  mailboxId String
+  userId    String
+  date      DateTime
+  sent      Int      @default(0)
+  received  Int      @default(0)
+  replies   Int      @default(0)
+  bounces   Int      @default(0)
+
+  @@unique([mailboxId, date])
+}

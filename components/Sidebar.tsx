@@ -17,7 +17,7 @@ const mainNav = [
   { name: "Sequencers", icon: GitBranch, href: "#" },
   { name: "Exports", icon: Download, href: "#" },
   { name: "Prewarm", icon: Flame, href: "#", badge: "New" },
-  { name: "Email Insights", icon: BarChart3, href: "#" },
+  { name: "Email Insights", icon: BarChart3, href: "/insights" },
 ];
 
 const workspaceNav = [
