@@ -11,11 +11,6 @@ function cfHeaders() {
   };
 }
 
-async function getOwnedDomain(id: string, userId: string) {
-  return prisma.domain.findFirst({ where: { id, userId } });
-}
-
-// GET — live DNS records from Cloudflare
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -24,13 +19,14 @@ export async function GET(
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const domain = await getOwnedDomain(id, userId);
+  const domain = await prisma.domain.findFirst({ where: { id, userId } });
   if (!domain || !domain.zoneId)
     return NextResponse.json({ error: "Domain not found" }, { status: 404 });
 
-  const res = await fetch(CF + "/zones/" + domain.zoneId + "/dns_records?per_page=100", {
-    headers: cfHeaders(),
-  });
+  const res = await fetch(
+    CF + "/zones/" + domain.zoneId + "/dns_records?per_page=100",
+    { headers: cfHeaders() }
+  );
   const data = await res.json();
   if (!data.success)
     return NextResponse.json({ error: "Cloudflare error" }, { status: 502 });
@@ -38,7 +34,6 @@ export async function GET(
   return NextResponse.json(data.result);
 }
 
-// POST — create a DNS record on Cloudflare
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -47,7 +42,7 @@ export async function POST(
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const domain = await getOwnedDomain(id, userId);
+  const domain = await prisma.domain.findFirst({ where: { id, userId } });
   if (!domain || !domain.zoneId)
     return NextResponse.json({ error: "Domain not found" }, { status: 404 });
 

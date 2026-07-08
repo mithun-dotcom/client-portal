@@ -40,8 +40,12 @@ export default function DomainPanel({
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/domains/" + domain.id + "/records");
-    if (res.ok) setRecords(await res.json());
+    try {
+      const res = await fetch("/api/domains/" + domain.id + "/records");
+      if (res.ok) setRecords(await res.json());
+    } catch {
+      // ignore, records stay empty
+    }
     setLoading(false);
   }, [domain.id]);
 
@@ -49,7 +53,6 @@ export default function DomainPanel({
     load();
   }, [load]);
 
-  // ---- record health checks ----
   const hasSPF = records.some(
     (r) => r.type === "TXT" && r.content.includes("v=spf1")
   );
@@ -96,20 +99,30 @@ export default function DomainPanel({
       ? "/api/domains/" + domain.id + "/records/" + editingId
       : "/api/domains/" + domain.id + "/records";
 
-    const res = await fetch(url, {
-      method: editingId ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
+    try {
+      const res = await fetch(url, {
+        method: editingId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
 
-    setSaving(false);
-
-    if (res.ok) {
-      cancelEdit();
-      load();
-    } else {
-      const data = await res.json();
-      setMessage(data.error || "Something went wrong");
+      if (res.ok) {
+        cancelEdit();
+        load();
+      } else {
+        let msg = "Request failed with status " + res.status;
+        try {
+          const data = await res.json();
+          if (data.error) msg = data.error;
+        } catch {
+          // response had no JSON body — keep the status message
+        }
+        setMessage(msg);
+      }
+    } catch {
+      setMessage("Network error — is the server running?");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -290,7 +303,9 @@ export default function DomainPanel({
 
               {/* Records list */}
               <p className="mt-6 text-sm font-semibold text-gray-900">
-                {loading ? "Loading records from Cloudflare..." : records.length + " DNS records"}
+                {loading
+                  ? "Loading records from Cloudflare..."
+                  : records.length + " DNS records"}
               </p>
               <div className="mt-3 space-y-2">
                 {records.map((r) => (

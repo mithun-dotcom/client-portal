@@ -11,7 +11,6 @@ function cfHeaders() {
   };
 }
 
-// PUT — update a record
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string; recordId: string }> }
@@ -50,7 +49,6 @@ export async function PUT(
   return NextResponse.json(data.result);
 }
 
-// DELETE — remove a record
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string; recordId: string }> }
