@@ -235,7 +235,7 @@ export default function DomainsPage() {
           {selected && (
             <DomainPanel
               domain={selected}
-              mailboxCount={mailboxCount(selected.id)}
+              
               onClose={() => setSelected(null)}
             />
           )}

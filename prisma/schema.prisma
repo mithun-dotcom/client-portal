@@ -15,6 +15,7 @@ model Domain {
   zoneId      String?
   userId      String
   createdAt   DateTime @default(now())
+  forwardingUrl String?
 
   @@unique([userId, name])
 }

@@ -8,6 +8,7 @@ type Domain = {
   name: string;
   status: string;
   nameservers: string[];
+  forwardingUrl?: string | null;
 };
 
 type DnsRecord = {
@@ -19,32 +20,49 @@ type DnsRecord = {
   priority?: number;
 };
 
+type Mailbox = {
+  id: string;
+  email: string;
+  status: string;
+  domainId: string;
+  createdAt: string;
+};
+
 const emptyForm = { type: "TXT", name: "", content: "", ttl: "3600", priority: "0" };
 
 export default function DomainPanel({
   domain,
-  mailboxCount,
   onClose,
 }: {
   domain: Domain;
-  mailboxCount: number;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<"overview" | "dns">("overview");
+  const [tab, setTab] = useState<"overview" | "dns" | "settings" | "mailboxes">(
+    "overview"
+  );
   const [records, setRecords] = useState<DnsRecord[]>([]);
+  const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ ...emptyForm });
   const [editingId, setEditingId] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [fwdUrl, setFwdUrl] = useState(domain.forwardingUrl || "");
+  const [fwdSaving, setFwdSaving] = useState(false);
+  const [fwdMessage, setFwdMessage] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/domains/" + domain.id + "/records");
       if (res.ok) setRecords(await res.json());
+      const mres = await fetch("/api/mailboxes");
+      if (mres.ok) {
+        const all: Mailbox[] = await mres.json();
+        setMailboxes(all.filter((m) => m.domainId === domain.id));
+      }
     } catch {
-      // ignore, records stay empty
+      // keep whatever we have
     }
     setLoading(false);
   }, [domain.id]);
@@ -94,18 +112,15 @@ export default function DomainPanel({
   async function saveRecord() {
     setSaving(true);
     setMessage("");
-
     const url = editingId
       ? "/api/domains/" + domain.id + "/records/" + editingId
       : "/api/domains/" + domain.id + "/records";
-
     try {
       const res = await fetch(url, {
         method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-
       if (res.ok) {
         cancelEdit();
         load();
@@ -114,9 +129,7 @@ export default function DomainPanel({
         try {
           const data = await res.json();
           if (data.error) msg = data.error;
-        } catch {
-          // response had no JSON body — keep the status message
-        }
+        } catch {}
         setMessage(msg);
       }
     } catch {
@@ -127,11 +140,50 @@ export default function DomainPanel({
   }
 
   async function deleteRecord(id: string) {
-    if (!confirm("Delete this DNS record? This updates Cloudflare immediately.")) return;
+    if (!confirm("Delete this DNS record? This updates Cloudflare immediately."))
+      return;
     await fetch("/api/domains/" + domain.id + "/records/" + id, {
       method: "DELETE",
     });
     load();
+  }
+
+  async function saveForwarding() {
+    setFwdSaving(true);
+    setFwdMessage("");
+    try {
+      const res = await fetch("/api/domains/" + domain.id + "/forwarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: fwdUrl }),
+      });
+      if (res.ok) {
+        setFwdMessage("✓ Forwarding saved — Cloudflare redirect is live");
+        load();
+      } else {
+        let msg = "Request failed with status " + res.status;
+        try {
+          const data = await res.json();
+          if (data.error) msg = data.error;
+        } catch {}
+        setFwdMessage(msg);
+      }
+    } catch {
+      setFwdMessage("Network error");
+    } finally {
+      setFwdSaving(false);
+    }
+  }
+
+  async function removeForwarding() {
+    setFwdSaving(true);
+    setFwdMessage("");
+    await fetch("/api/domains/" + domain.id + "/forwarding", {
+      method: "DELETE",
+    });
+    setFwdUrl("");
+    setFwdSaving(false);
+    setFwdMessage("Forwarding removed");
   }
 
   return (
@@ -147,7 +199,7 @@ export default function DomainPanel({
 
         {/* Tabs */}
         <div className="flex gap-6 border-b border-gray-100 px-6">
-          {(["overview", "dns"] as const).map((t) => (
+          {(["overview", "dns", "settings", "mailboxes"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -185,7 +237,15 @@ export default function DomainPanel({
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm">
                   <span className="text-gray-700">Mailboxes</span>
-                  <span className="font-medium text-gray-900">{mailboxCount}</span>
+                  <span className="font-medium text-gray-900">
+                    {mailboxes.length}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-sm">
+                  <span className="text-gray-700">Domain Forwarding</span>
+                  <span className="max-w-[50%] truncate font-medium text-gray-900">
+                    {domain.forwardingUrl || "—"}
+                  </span>
                 </div>
               </div>
 
@@ -232,7 +292,6 @@ export default function DomainPanel({
           {/* ================= DNS ================= */}
           {tab === "dns" && (
             <div>
-              {/* Add / edit form */}
               <div className="rounded-2xl border border-gray-200 p-4">
                 <p className="text-sm font-semibold text-gray-900">
                   {editingId ? "Edit record" : "Add record"}
@@ -301,7 +360,6 @@ export default function DomainPanel({
                 </div>
               </div>
 
-              {/* Records list */}
               <p className="mt-6 text-sm font-semibold text-gray-900">
                 {loading
                   ? "Loading records from Cloudflare..."
@@ -335,6 +393,113 @@ export default function DomainPanel({
                     >
                       <Trash2 size={15} />
                     </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ================= SETTINGS ================= */}
+          {tab === "settings" && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Basic Settings
+                </h3>
+                <label className="mt-4 block text-sm font-medium text-gray-700">
+                  Domain Forwarding URL
+                </label>
+                <p className="text-xs text-gray-400">
+                  Visitors to {domain.name} will be redirected here (301). Creates
+                  a redirect rule in Cloudflare instantly.
+                </p>
+                <input
+                  value={fwdUrl}
+                  onChange={(e) => setFwdUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-emerald-700"
+                />
+
+                {fwdMessage && (
+                  <p
+                    className={
+                      "mt-2 text-sm " +
+                      (fwdMessage.startsWith("✓")
+                        ? "text-emerald-700"
+                        : "text-red-600")
+                    }
+                  >
+                    {fwdMessage}
+                  </p>
+                )}
+
+                <div className="mt-4 flex gap-3">
+                  <button
+                    onClick={saveForwarding}
+                    disabled={fwdSaving || !fwdUrl.trim()}
+                    className="rounded-xl bg-emerald-900 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                  >
+                    {fwdSaving ? "Saving..." : "Save Changes"}
+                  </button>
+                  {domain.forwardingUrl && (
+                    <button
+                      onClick={removeForwarding}
+                      disabled={fwdSaving}
+                      className="rounded-xl border border-red-200 px-5 py-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      Remove Forwarding
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-500">
+                Catch-all email, DMARC email and mask forwarding require email
+                routing — coming in a future update.
+              </div>
+            </div>
+          )}
+
+          {/* ================= MAILBOXES ================= */}
+          {tab === "mailboxes" && (
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Domain Mailboxes
+                </h3>
+                <span className="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600">
+                  {mailboxes.length} mailboxes
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {mailboxes.length === 0 && (
+                  <p className="rounded-xl border border-gray-100 bg-gray-50 p-6 text-center text-sm text-gray-400">
+                    No mailboxes under this domain yet
+                  </p>
+                )}
+                {mailboxes.map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {m.email}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Created: {new Date(m.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    {m.status === "active" ? (
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                        ✓ Active
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                        {m.status}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
