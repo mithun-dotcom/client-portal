@@ -61,3 +61,13 @@ model EmailStat {
 
   @@unique([mailboxId, date])
 }
+model BlacklistCheck {
+  id         String   @id @default(cuid())
+  domainId   String   @unique
+  userId     String
+  checkedIp  String
+  listedOn   String[]
+  totalLists Int      @default(0)
+  errorCount Int      @default(0)
+  checkedAt  DateTime @default(now())
+}

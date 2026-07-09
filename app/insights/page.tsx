@@ -15,15 +15,15 @@ type MailboxReport = {
   bounceRate: number;
 };
 
-type ListResult = { list: string; status: "clean" | "listed" | "error" };
-
 type BlacklistReport = {
   id: string;
   name: string;
-  verdict: "clean" | "listed" | "partial";
-  listedCount: number;
-  checkedCount: number;
-  results: ListResult[];
+  checkedIp: string | null;
+  listedOn: string[];
+  totalLists: number;
+  errorCount: number;
+  checkedAt: string | null;
+  verdict: "clean" | "listed" | "unchecked";
 };
 
 const healthStyles: Record<string, string> = {
@@ -42,9 +42,10 @@ const healthLabels: Record<string, string> = {
 
 export default function InsightsPage() {
   const [mailboxes, setMailboxes] = useState<MailboxReport[]>([]);
-  const [blacklists, setBlacklists] = useState<BlacklistReport[]>([]);
-  const [blLoading, setBlLoading] = useState(true);
   const [mbLoading, setMbLoading] = useState(true);
+  const [blacklists, setBlacklists] = useState<BlacklistReport[]>([]);
+  const [checkingId, setCheckingId] = useState("");
+  const [checkingAll, setCheckingAll] = useState(false);
 
   useEffect(() => {
     fetch("/api/insights").then(async (res) => {
@@ -55,11 +56,37 @@ export default function InsightsPage() {
       setMbLoading(false);
     });
 
-    fetch("/api/insights/blacklist").then(async (res) => {
-      if (res.ok) setBlacklists(await res.json());
-      setBlLoading(false);
-    });
+    loadBlacklists();
   }, []);
+
+  async function loadBlacklists() {
+    const res = await fetch("/api/insights/blacklist");
+    if (res.ok) setBlacklists(await res.json());
+  }
+
+  async function checkDomain(domainId: string) {
+    setCheckingId(domainId);
+    const res = await fetch("/api/insights/blacklist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domainId }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setBlacklists((prev) =>
+        prev.map((b) => (b.id === updated.id ? updated : b))
+      );
+    }
+    setCheckingId("");
+  }
+
+  async function checkAll() {
+    setCheckingAll(true);
+    for (const b of blacklists) {
+      await checkDomain(b.id);
+    }
+    setCheckingAll(false);
+  }
 
   return (
     <>
@@ -91,51 +118,68 @@ export default function InsightsPage() {
               </p>
 
               {/* ===== Blacklist Status ===== */}
-              <p className="pb-3 pt-8 text-xs font-semibold tracking-wider text-gray-400">
-                DOMAIN BLACKLIST STATUS
-              </p>
-              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                {blLoading && (
-                  <p className="px-6 py-10 text-center text-sm text-gray-400">
-                    Checking domains against spam blacklists...
-                  </p>
+              <div className="flex items-center justify-between pb-3 pt-8">
+                <p className="text-xs font-semibold tracking-wider text-gray-400">
+                  DOMAIN BLACKLIST STATUS
+                </p>
+                {blacklists.length > 0 && (
+                  <button
+                    onClick={checkAll}
+                    disabled={checkingAll || checkingId !== ""}
+                    className="rounded-xl bg-emerald-900 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                  >
+                    {checkingAll ? "Checking all..." : "Check all domains"}
+                  </button>
                 )}
-                {!blLoading && blacklists.length === 0 && (
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                {blacklists.length === 0 && (
                   <p className="px-6 py-10 text-center text-sm text-gray-400">
                     No domains to check
                   </p>
                 )}
-                {!blLoading &&
-                  blacklists.map((b) => {
-                    const listedOn = b.results.filter((r) => r.status === "listed");
-                    return (
-                      <div
-                        key={b.id}
-                        className="flex items-center justify-between border-b border-gray-50 px-6 py-4 last:border-b-0"
+                {blacklists.map((b) => (
+                  <div
+                    key={b.id}
+                    className="flex items-center justify-between border-b border-gray-50 px-6 py-4 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900">{b.name}</p>
+                      {b.checkedAt && (
+                        <p className="text-xs text-gray-400">
+                          {b.totalLists} lists checked · IP {b.checkedIp}
+                          {b.errorCount > 0 && " · " + b.errorCount + " unreachable"}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-3">
+                      {b.verdict === "clean" && (
+                        <span className="rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-semibold text-emerald-700">
+                          ✓ Good health
+                        </span>
+                      )}
+                      {b.verdict === "listed" && (
+                        <span className="max-w-md truncate rounded-full bg-red-50 px-4 py-1.5 text-xs font-semibold text-red-600">
+                          ✗ Blacklisted in {b.listedOn.join(", ")}
+                        </span>
+                      )}
+                      {b.verdict === "unchecked" && (
+                        <span className="rounded-full bg-gray-100 px-4 py-1.5 text-xs font-medium text-gray-500">
+                          Not checked yet
+                        </span>
+                      )}
+                      <button
+                        onClick={() => checkDomain(b.id)}
+                        disabled={checkingId === b.id || checkingAll}
+                        className="rounded-xl border border-gray-200 px-4 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                       >
-                        <p className="font-semibold text-gray-900">{b.name}</p>
-
-                        {b.verdict === "clean" && (
-                          <span className="rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-semibold text-emerald-700">
-                            ✓ Good health
-                          </span>
-                        )}
-
-                        {b.verdict === "listed" && (
-                          <span className="rounded-full bg-red-50 px-4 py-1.5 text-xs font-semibold text-red-600">
-                            ✗ Blacklisted in{" "}
-                            {listedOn.map((r) => r.list).join(", ")}
-                          </span>
-                        )}
-
-                        {b.verdict === "partial" && (
-                          <span className="rounded-full bg-gray-100 px-4 py-1.5 text-xs font-medium text-gray-500">
-                            Could not check
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                        {checkingId === b.id ? "Checking..." : "Check now"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* ===== Mailbox Health ===== */}
@@ -205,9 +249,10 @@ export default function InsightsPage() {
               </div>
 
               <p className="mt-3 text-xs text-gray-400">
-                Blacklist checks query Spamhaus DBL, SURBL, URIBL and SEM. Sending
-                stats populate automatically once warmup and sequencer integrations
-                are connected.
+                Blacklist checks query 40+ domain and IP blacklists live (Spamhaus,
+                Barracuda, SORBS, SURBL and more). Results are cached until you
+                re-check. Sending stats populate automatically once warmup and
+                sequencer integrations are connected.
               </p>
             </div>
           </main>
